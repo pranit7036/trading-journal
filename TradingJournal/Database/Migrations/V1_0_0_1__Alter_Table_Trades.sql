@@ -1,0 +1,3 @@
+﻿ALTER TABLE "Trades"
+ALTER COLUMN "Id" TYPE UUID
+USING "Id"::uuid;

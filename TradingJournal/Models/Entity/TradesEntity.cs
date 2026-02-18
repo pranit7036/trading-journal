@@ -2,7 +2,7 @@
 {
     public class TradesEntity
     {
-        public string Id { get; set; } //guid
+        public Guid Id { get; set; } //guid
         public string Symbol { get; set; } // name of stock i.e. symbol of stock
         public string InstrumentType { get; set; } // Equity, F&O 
         // order type MIS or NORMAL

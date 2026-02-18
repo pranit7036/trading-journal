@@ -1,0 +1,30 @@
+@TradingJournal_HostAddress = http://localhost:5075
+
+# Add a new trade
+POST {{TradingJournal_HostAddress}}/api/trades/add
+Content-Type: application/json
+
+{
+	"symbol": "AAPL",
+	"instrumentType": "Equity",
+	"tradeType": "Buy",
+	"entryPrice": 150.5,
+	"exitPrice": 155.0,
+	"quantity": 10,
+	"stoploss": 149.0,
+	"target": 160.0,
+	"entryTime": "2026-02-18T09:30:00Z",
+	"exitTime": "2026-02-18T15:30:00Z",
+	"charges": 2.5,
+	"strategy": "Breakout",
+	"setup": "Morning",
+	"notes": "Test trade"
+}
+
+###
+
+# Get all trades
+GET {{TradingJournal_HostAddress}}/api/trades/getdata
+Accept: application/json
+
+###

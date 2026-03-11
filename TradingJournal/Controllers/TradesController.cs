@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using TradingJournal.Interfaces.Services;
+using TradingJournal.Models;
 using TradingJournal.Models.Dto;
 using TradingJournal.Models.Entity;
 
@@ -34,9 +35,14 @@ namespace TradingJournal.Controllers
 
             var result = await _tradeService.ValidateTrades(inputTrade);
 
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
             return Ok(result);
 
-            //if (inputTrade.)
+             //if (inputTrade.)
 
             //if ()
             //{
@@ -52,9 +58,64 @@ namespace TradingJournal.Controllers
         public async Task<ActionResult<object>> GetData ()
         {
             var result = await _tradeService.GetTrades();
-            
-            if (result == null) {
-                return BadRequest("Empty Data");
+
+            if (!result.Success) {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+
+        [HttpPatch]
+        [Route("edit/{id}")]
+        public async Task<ActionResult<object>> EditData(string id, [FromBody] UpdateTradeDto tradeData)
+        {
+            if (id == null)
+            {
+                return BadRequest("Id can not be null");
+            }
+
+            if (tradeData == null)
+            {
+                return BadRequest("Data can't be null");
+            }
+
+            var result = await _tradeService.EditTrade(Guid.Parse(id), tradeData);
+
+            if (!result.Success) {
+                return NotFound(result);
+            }
+
+            return Ok(result);
+        }
+
+        [HttpDelete]
+        [Route("deleteall")]
+        public async Task<ActionResult<object>> DeleteAllTrades()
+        {
+            var result = await _tradeService.DeleteAllTrades();
+
+            if (!result.Success)
+            {
+                return StatusCode(500, result);
+            }
+
+            return Ok(result);
+        }
+
+        [HttpDelete]
+        [Route("delete/{id}")]
+        public async Task<ActionResult<object>> DeleteTrade(Guid id)
+        {
+
+            if (id == Guid.Empty)
+            {
+                return BadRequest(new Response { Success = false, Message = "Please give a valid id", Data = null });
+            }
+            var result = await _tradeService.DeleteTrade(id);
+
+            if (!result.Success) {
+                return BadRequest(result);
             }
 
             return result;

@@ -47,7 +47,7 @@ namespace TradingJournal.Mappers
                 EntryTime = tradeEntity.EntryTime,
                 ExitTime = tradeEntity.ExitTime,
                 Charges = tradeEntity.Charges,
-                ProfitAndLoss = tradeEntity.ProfitAndLoss,
+                //ProfitAndLoss = tradeEntity.ProfitAndLoss,
                 Strategy = tradeEntity?.Strategy,
                 Setup = tradeEntity?.Setup,
                 Notes = tradeEntity?.Notes

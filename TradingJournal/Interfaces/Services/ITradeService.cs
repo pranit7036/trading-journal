@@ -7,5 +7,8 @@ namespace TradingJournal.Interfaces.Services
     {
         public Task<Response> ValidateTrades(TradesDto inputTrade);
         public Task<Response> GetTrades();
+        public Task<Response> EditTrade(Guid id, UpdateTradeDto tradeData);
+        public Task<Response> DeleteAllTrades();
+        public Task<Response> DeleteTrade(Guid id);
     }
 }

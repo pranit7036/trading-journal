@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using TradingJournal.Interfaces.Services;
@@ -10,6 +11,7 @@ namespace TradingJournal.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TradesController : ControllerBase
     {
         private readonly ITradeService _tradeService;

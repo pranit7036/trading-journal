@@ -11,7 +11,7 @@ namespace TradingJournal.Mappers
         {
             TradesEntity trade = new TradesEntity()
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 Symbol = tradeDto.Symbol.ToUpper(),
                 InstrumentType = tradeDto.InstrumentType.ToLower(),
                 TradeType = tradeDto.TradeType.ToLower(),
@@ -35,7 +35,7 @@ namespace TradingJournal.Mappers
         {
             TradesDto trade = new TradesDto()
             {
-                Id = Guid.Parse(tradeEntity.Id),
+                Id = tradeEntity.Id,
                 Symbol = tradeEntity.Symbol,
                 InstrumentType = tradeEntity.InstrumentType,
                 TradeType = tradeEntity.TradeType,
@@ -47,7 +47,7 @@ namespace TradingJournal.Mappers
                 EntryTime = tradeEntity.EntryTime,
                 ExitTime = tradeEntity.ExitTime,
                 Charges = tradeEntity.Charges,
-                ProfitAndLoss = tradeEntity.ProfitAndLoss,
+                //ProfitAndLoss = tradeEntity.ProfitAndLoss,
                 Strategy = tradeEntity?.Strategy,
                 Setup = tradeEntity?.Setup,
                 Notes = tradeEntity?.Notes

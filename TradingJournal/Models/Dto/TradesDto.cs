@@ -14,7 +14,7 @@
         public DateTime EntryTime { get; set; }
         public DateTime ExitTime { get; set; }
         public decimal Charges { get; set; } // will calculate this later
-        public decimal ProfitAndLoss { get; set; }
+        // public decimal ProfitAndLoss { get; set; }
         public string? Strategy { get; set; }
         public string? Setup { get; set; }
         public string? Notes { get; set; }

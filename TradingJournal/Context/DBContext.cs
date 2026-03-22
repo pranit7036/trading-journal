@@ -6,5 +6,6 @@ namespace TradingJournal.Context
     {
         public DBContext(DbContextOptions<DBContext> options) : base(options) { }
         public DbSet <TradesEntity> Trades { get; set; }
+        public DbSet <UserEntity> Users { get; set; }
     }
 }

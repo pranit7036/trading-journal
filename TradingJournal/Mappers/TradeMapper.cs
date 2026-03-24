@@ -7,7 +7,7 @@ namespace TradingJournal.Mappers
     {
         public TradeMapper() { }
         
-        public TradesEntity ConvertDtoToEntity (TradesDto tradeDto, decimal profitAndLoss)
+        public TradesEntity ConvertDtoToEntity (TradesDto tradeDto, decimal profitAndLoss, Guid userId)
         {
             TradesEntity trade = new TradesEntity()
             {
@@ -27,6 +27,7 @@ namespace TradingJournal.Mappers
                 Strategy = tradeDto?.Strategy,
                 Setup = tradeDto?.Setup,
                 Notes = tradeDto?.Notes,
+                UserId = userId,
             };
             return trade;
         }

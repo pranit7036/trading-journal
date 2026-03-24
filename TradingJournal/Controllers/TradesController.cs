@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.IdentityModel.Tokens.Jwt;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Models;
 using TradingJournal.Models.Dto;
@@ -10,6 +12,7 @@ namespace TradingJournal.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TradesController : ControllerBase
     {
         private readonly ITradeService _tradeService;
@@ -33,7 +36,18 @@ namespace TradingJournal.Controllers
                 return BadRequest("Data is invalid");
             }
 
-            var result = await _tradeService.ValidateTrades(inputTrade);
+            var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new Response
+                {
+                    Success = false,
+                    Message = "Invalid user token",
+                    Data = null
+                });
+            }
+
+            var result = await _tradeService.ValidateTrades(inputTrade, userId);
 
             if (!result.Success)
             {

@@ -22,7 +22,7 @@ namespace TradingJournal.Services
 
         // can make a simple validation function to validate the trades or input and simple save and update to svae nad update the trade.
 
-        public async Task<Response> ValidateTrades (TradesDto inputTrade)
+        public async Task<Response> ValidateTrades (TradesDto inputTrade, Guid userId)
         {
             if(inputTrade.EntryPrice <= 0 || inputTrade.ExitPrice <=0)
             {
@@ -86,7 +86,7 @@ namespace TradingJournal.Services
 
             decimal profitAndLoss = CalculateProfitAndLoss(inputTrade.TradeType.ToLower(), inputTrade.EntryPrice, inputTrade.ExitPrice, inputTrade.Quantity);
 
-            TradesEntity tradesEntity = _tradeMapper.ConvertDtoToEntity(inputTrade,profitAndLoss);
+            TradesEntity tradesEntity = _tradeMapper.ConvertDtoToEntity(inputTrade,profitAndLoss, userId);
 
             // save data 
             var result = await _tradesRepository.Save(tradesEntity);

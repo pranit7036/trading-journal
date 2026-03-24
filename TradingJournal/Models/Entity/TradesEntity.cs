@@ -22,5 +22,7 @@
         public string? Strategy { get; set; }
         public string? Setup { get; set; }
         public string? Notes { get; set; }
+        public Guid? UserId { get; set; }
+        public UserEntity? User { get; set; }
     }
 }

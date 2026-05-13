@@ -7,6 +7,7 @@ namespace TradingJournal.Context
         public DBContext(DbContextOptions<DBContext> options) : base(options) { }
         public DbSet <TradesEntity> Trades { get; set; }
         public DbSet <UserEntity> Users { get; set; }
+        public DbSet <BrokerEntity> Brokers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -15,6 +16,16 @@ namespace TradingJournal.Context
                 .WithMany(u => u.Trades)
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BrokerEntity>()
+                .HasOne(b => b.User)
+                .WithMany(u => u.Brokers)
+                .HasForeignKey(b => b.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BrokerEntity>()
+                .HasIndex(b => new { b.UserID, b.BrokerName })
+                .IsUnique();
         }
     }
 }

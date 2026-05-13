@@ -9,5 +9,6 @@
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiry { get; set; }
         public ICollection<TradesEntity> Trades { get; set; } = new List<TradesEntity>();
+        public ICollection<BrokerEntity> Brokers { get; set; } = new List<BrokerEntity>();
     }
 }

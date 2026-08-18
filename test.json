@@ -1,0 +1,27 @@
+{
+    "success": true,
+    "message": "Zerodha callback received successfully",
+    "data": {
+        "requestToken": "lLar2Jfzu0aFJofMKM8Z0OHTYokdmACX",
+        "status": "success",
+        "result": {
+            "result": {
+                "success": true,
+                "message": "Token generated",
+                "data": {
+                    "accessToken": "ty7pHfbPmIQWNkE00SZihKKhGheH15uV",
+                    "userId": "GPD523"
+                }
+            },
+            "id": 113,
+            "exception": null,
+            "status": 5,
+            "isCanceled": false,
+            "isCompleted": true,
+            "isCompletedSuccessfully": true,
+            "creationOptions": 0,
+            "asyncState": null,
+            "isFaulted": false
+        }
+    }
+}

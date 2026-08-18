@@ -54,25 +54,25 @@ namespace TradingJournal.Services
             }
 
 
-            if (!IsWithinMarketHours(inputTrade.EntryTime))
-            {
-                return (new Response
-                {
-                    Success = false,
-                    Message = "Entry time is outside market hours (9:15 AM to 3:30 PM IST)",
-                    Data = null
-                });
-            }
+            //if (!IsWithinMarketHours(inputTrade.EntryTime))
+            //{
+            //    return (new Response
+            //    {
+            //        Success = false,
+            //        Message = "Entry time is outside market hours (9:15 AM to 3:30 PM IST)",
+            //        Data = null
+            //    });
+            //}
 
-            if (!IsWithinMarketHours(inputTrade.ExitTime))
-            {
-                return (new Response
-                {
-                    Success = false,
-                    Message = "Exit time is outside market hours (9:15 AM to 3:30 PM IST)",
-                    Data = null
-                });
-            }
+            //if (!IsWithinMarketHours(inputTrade.ExitTime))
+            //{
+            //    return (new Response
+            //    {
+            //        Success = false,
+            //        Message = "Exit time is outside market hours (9:15 AM to 3:30 PM IST)",
+            //        Data = null
+            //    });
+            //}
 
             if(inputTrade.EntryTime>inputTrade.ExitTime)
             {

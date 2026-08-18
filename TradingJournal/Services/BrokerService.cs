@@ -66,6 +66,85 @@ namespace TradingJournal.Services
             };
         }
 
+        public async Task<Response> GetBrokersByUserId(Guid userId)
+        {
+            if (userId == Guid.Empty)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "UserID is required",
+                    Data = null
+                };
+            }
+
+            var brokers = await _brokerRepository.GetBrokersByUserId(userId);
+            var brokerList = new List<BrokerSummaryDto>();
+
+            foreach (var broker in brokers)
+            {
+                brokerList.Add(new BrokerSummaryDto
+                {
+                    Id = broker.Id,
+                    BrokerName = broker.BrokerName,
+                    ApiKey = broker.ApiKey,
+                    IsActive = broker.IsActive,
+                    TokenExpiry = broker.TokenExpiry
+                });
+            }
+
+            return new Response
+            {
+                Success = true,
+                Message = "Brokers fetched successfully",
+                Data = brokerList
+            };
+        }
+
+        public async Task<Response> DeleteBroker(Guid brokerId, Guid userId)
+        {
+            if (brokerId == Guid.Empty)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "BrokerId is required",
+                    Data = null
+                };
+            }
+
+            if (userId == Guid.Empty)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "UserID is required",
+                    Data = null
+                };
+            }
+
+            var broker = await _brokerRepository.FindBroker(brokerId, userId);
+
+            if (broker == null)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "Broker not found",
+                    Data = null
+                };
+            }
+
+            await _brokerRepository.DeleteBroker(broker);
+
+            return new Response
+            {
+                Success = true,
+                Message = "Broker deleted",
+                Data = null
+            };
+        }
+
         private Response ValidateBrokerData(BrokerDto brokerDto)
         {
             if (string.IsNullOrWhiteSpace(brokerDto.BrokerName))
@@ -104,26 +183,6 @@ namespace TradingJournal.Services
                 {
                     Success = false,
                     Message = "ApiSecret is required",
-                    Data = null
-                };
-            }
-
-            if (string.IsNullOrWhiteSpace(brokerDto.AccessToken))
-            {
-                return new Response
-                {
-                    Success = false,
-                    Message = "AccessToken is required",
-                    Data = null
-                };
-            }
-
-            if (string.IsNullOrWhiteSpace(brokerDto.RefreshToken))
-            {
-                return new Response
-                {
-                    Success = false,
-                    Message = "RefreshToken is required",
                     Data = null
                 };
             }

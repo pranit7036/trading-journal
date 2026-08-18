@@ -55,6 +55,11 @@ namespace TradingJournal.Controllers
                 return BadRequest(new Response { Success = false, Message = "Error while refreshing the token", Data = null });
             }
 
+            if (string.IsNullOrWhiteSpace(tokenDto.AccessToken) || string.IsNullOrWhiteSpace(tokenDto.RefreshToken))
+            {
+                return BadRequest(new Response { Success = false, Message = "AccessToken and RefreshToken are required", Data = null });
+            }
+
             var result = await UserService.RefreshToken(tokenDto);
 
             return Ok(result);

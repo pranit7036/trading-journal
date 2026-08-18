@@ -1,8 +1,10 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using TradingJournal.Interfaces.Repository;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Models;
+using TradingJournal.Models.Dto;
 
 namespace TradingJournal.Services
 {
@@ -10,11 +12,18 @@ namespace TradingJournal.Services
     {
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IBrokerRepository _brokerRepository;
         
-        public ZerodhaService(IConfiguration configuration, IHttpClientFactory httpClientFactory)
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        public ZerodhaService(IConfiguration configuration, IHttpClientFactory httpClientFactory, IBrokerRepository brokerRepository)
         {
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
+            _brokerRepository = brokerRepository;
         }
 
         public async Task<Response> GetToken(string requestToken)
@@ -52,6 +61,149 @@ namespace TradingJournal.Services
             var userId = doc.RootElement.GetProperty("data").GetProperty("user_id").GetString();
 
             return new Response { Success = true, Message = "Token generated", Data = new { accessToken, userId } };
+        }
+
+        public async Task<Response> GetOrders(string apiKey, string accessToken)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(accessToken))
+            {
+                return new Response { Success = false, Message = "ApiKey or AccessToken is missing", Data = null };
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
+            client.DefaultRequestHeaders.Add("Authorization", $"token {apiKey}:{accessToken}");
+
+            var resp = await client.GetAsync("https://api.kite.trade/orders");
+            var body = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new Response { Success = false, Message = "Orders fetch failed", Data = body };
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                return new Response { Success = true, Message = "Orders fetched", Data = doc.RootElement.Clone() };
+            }
+            catch (JsonException)
+            {
+                return new Response { Success = true, Message = "Orders fetched", Data = body };
+            }
+        }
+
+        public async Task<Response> GetHoldings(string apiKey, string accessToken)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(accessToken))
+            {
+                return new Response { Success = false, Message = "ApiKey or AccessToken is missing", Data = null };
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
+            client.DefaultRequestHeaders.Add("Authorization", $"token {apiKey}:{accessToken}");
+
+            var resp = await client.GetAsync("https://api.kite.trade/portfolio/holdings");
+            var body = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new Response { Success = false, Message = "Holdings fetch failed", Data = body };
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var dataElement = doc.RootElement.GetProperty("data");
+                var holdings = JsonSerializer.Deserialize<List<HoldingDto>>(dataElement.GetRawText(), _jsonOptions);
+
+                return new Response { Success = true, Message = "Holdings fetched", Data = holdings };
+            }
+            catch (JsonException)
+            {
+                return new Response { Success = false, Message = "Failed to parse holdings response", Data = body };
+            }
+        }
+
+        public async Task<Response> GetPositions(string apiKey, string accessToken)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(accessToken))
+            {
+                return new Response { Success = false, Message = "ApiKey or AccessToken is missing", Data = null };
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
+            client.DefaultRequestHeaders.Add("Authorization", $"token {apiKey}:{accessToken}");
+
+            var resp = await client.GetAsync("https://api.kite.trade/portfolio/positions");
+            var body = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new Response { Success = false, Message = "Positions fetch failed", Data = body };
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var dataElement = doc.RootElement.GetProperty("data");
+                var positions = JsonSerializer.Deserialize<PositionsResponseDto>(dataElement.GetRawText(), _jsonOptions);
+
+                return new Response { Success = true, Message = "Positions fetched", Data = positions };
+            }
+            catch (JsonException)
+            {
+                return new Response { Success = false, Message = "Failed to parse positions response", Data = body };
+            }
+        }
+
+        public async Task<Response> SaveAccessToken(string requestToken)
+        {
+            // Exchange the request token for an access token
+            var tokenResponse = await GetToken(requestToken);
+            if (!tokenResponse.Success)
+            {
+                return tokenResponse;
+            }
+
+            var apiKey = _configuration["Zerodha:ApiKey"];
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return new Response { Success = false, Message = "Zerodha API key not configured", Data = null };
+            }
+
+            // Find the broker record by API key
+            var broker = await _brokerRepository.FindBrokerByApiKey(apiKey);
+            if (broker == null)
+            {
+                return new Response { Success = false, Message = "No broker found for the configured API key", Data = null };
+            }
+
+            // Extract tokens from the response
+            var data = tokenResponse.Data;
+            var accessToken = data?.GetType().GetProperty("accessToken")?.GetValue(data)?.ToString();
+
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                return new Response { Success = false, Message = "Access token not found in response", Data = null };
+            }
+
+            // Update the broker record with the access token
+            broker.AccessToken = accessToken;
+            broker.RefreshToken = requestToken; // Store the request token as refresh token for future re-auth
+            broker.TokenExpiry = DateTime.UtcNow.AddHours(8); // Zerodha tokens expire at 6 AM next day
+            broker.IsActive = true;
+
+            await _brokerRepository.UpdateBroker(broker);
+
+            return new Response
+            {
+                Success = true,
+                Message = "Access token saved successfully",
+                Data = new { accessToken, brokerId = broker.Id, userId = broker.UserID }
+            };
         }
 
     }

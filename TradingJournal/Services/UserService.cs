@@ -1,4 +1,5 @@
 ﻿using TradingJournal.Interfaces.Repository;
+using Microsoft.Extensions.Logging;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Mappers;
 using TradingJournal.Models;
@@ -16,11 +17,13 @@ namespace TradingJournal.Services
     {
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<UserService> _logger;
         private readonly UserMapper _userMapper = new UserMapper();
-        public UserService(IUserRepository userRepository, IConfiguration configuration)
+        public UserService(IUserRepository userRepository, IConfiguration configuration, ILogger<UserService> logger)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task<Response> RegisterUser(UserDto userDto)
@@ -150,7 +153,31 @@ namespace TradingJournal.Services
 
         public async Task<Response> RefreshToken(TokenDto tokenDto)
         {
-            var principal = GetPrincipalFromExpiredToken(tokenDto.AccessToken);
+            if (tokenDto == null || string.IsNullOrWhiteSpace(tokenDto.AccessToken) || string.IsNullOrWhiteSpace(tokenDto.RefreshToken))
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "AccessToken and RefreshToken are required",
+                    Data = null
+                };
+            }
+
+            ClaimsPrincipal principal;
+            try
+            {
+                principal = GetPrincipalFromExpiredToken(tokenDto.AccessToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Refresh token failed: access token validation error.");
+                return new Response
+                {
+                    Success = false,
+                    Message = "Invalid access token",
+                    Data = null
+                };
+            }
             var email = principal.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email)?.Value;
 
             if (email == null)
@@ -229,13 +256,16 @@ namespace TradingJournal.Services
                 throw new InvalidOperationException("JWT secret is not configured.");
             }
 
+            var issuer = _configuration["Jwt:Issuer"] ?? "TradingJournal";
+            var audience = _configuration["Jwt:Audience"] ?? "TradingJournal";
+
             var tokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = _configuration["Jwt:Issuer"],
-                ValidAudience = _configuration["Jwt:Audience"],
+                ValidIssuer = issuer,
+                ValidAudience = audience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
                 ValidateLifetime = false // only difference vs normal pipeline
             };

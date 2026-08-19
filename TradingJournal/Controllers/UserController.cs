@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Models;
@@ -48,19 +48,14 @@ namespace TradingJournal.Controllers
 
         [HttpPost]
         [Route("refresh-token")]
-        public async Task<IActionResult> RefreshToken(TokenDto tokenDto)
+        public async Task<IActionResult> RefreshToken(RefreshTokenRequestDto refreshTokenRequestDto)
         {
-            if (tokenDto == null)
+            if (refreshTokenRequestDto == null || string.IsNullOrWhiteSpace(refreshTokenRequestDto.RefreshToken))
             {
-                return BadRequest(new Response { Success = false, Message = "Error while refreshing the token", Data = null });
+                return BadRequest(new Response { Success = false, Message = "RefreshToken is required", Data = null });
             }
 
-            if (string.IsNullOrWhiteSpace(tokenDto.AccessToken) || string.IsNullOrWhiteSpace(tokenDto.RefreshToken))
-            {
-                return BadRequest(new Response { Success = false, Message = "AccessToken and RefreshToken are required", Data = null });
-            }
-
-            var result = await UserService.RefreshToken(tokenDto);
+            var result = await UserService.RefreshToken(refreshTokenRequestDto);
 
             return Ok(result);
         }

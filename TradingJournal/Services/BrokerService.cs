@@ -1,4 +1,4 @@
-﻿using TradingJournal.Interfaces.Repository;
+using TradingJournal.Interfaces.Repository;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Mappers;
 using TradingJournal.Models;
@@ -46,22 +46,60 @@ namespace TradingJournal.Services
             };
         }
 
-        public async Task<Response> UpdateBrokerData (BrokerDto brokerDto)
+        public async Task<Response> UpdateBrokerData(Guid brokerId, Guid userId, BrokerDto brokerDto)
         {
+            if (brokerId == Guid.Empty)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "BrokerId is required",
+                    Data = null
+                };
+            }
+
+            if (userId == Guid.Empty)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "UserID is required",
+                    Data = null
+                };
+            }
+
             var validationResponse = ValidateBrokerData(brokerDto);
 
             if (!validationResponse.Success)
             {
                 return validationResponse;
             }
-            
-            BrokerEntity brokerEntity = _brokerMapper.ConvertDtoToEntity(brokerDto);
-            var result = await _brokerRepository.UpdateBroker(brokerEntity);
+
+            // Verify the broker exists and belongs to this user
+            var existingBroker = await _brokerRepository.FindBroker(brokerId, userId);
+
+            if (existingBroker == null)
+            {
+                return new Response
+                {
+                    Success = false,
+                    Message = "Broker not found or does not belong to this user",
+                    Data = null
+                };
+            }
+
+            // Update only the allowed fields on the tracked entity
+            existingBroker.BrokerName = brokerDto.BrokerName;
+            existingBroker.ApiKey     = brokerDto.ApiKey;
+            existingBroker.ApiSecret  = brokerDto.ApiSecret;
+            existingBroker.IsActive   = brokerDto.IsActive;
+
+            await _brokerRepository.UpdateBroker(existingBroker);
 
             return new Response
             {
                 Success = true,
-                Message = "Broker data is valid",
+                Message = "Broker updated successfully",
                 Data = null
             };
         }

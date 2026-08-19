@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using TradingJournal.Context;
 using TradingJournal.Interfaces.Repository;
 using TradingJournal.Models;
@@ -59,6 +59,18 @@ namespace TradingJournal.Repository
             try
             {
                 return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<UserEntity?> GetUserByRefreshToken(string refreshToken)
+        {
+            try
+            {
+                return await _context.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
             }
             catch (Exception ex)
             {

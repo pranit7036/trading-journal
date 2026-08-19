@@ -10,7 +10,7 @@ namespace TradingJournal.Mappers
         {
             BrokerEntity broker = new BrokerEntity()
             {
-                Id = Guid.NewGuid(),
+                Id = brokerDto.Id != Guid.Empty ? brokerDto.Id : Guid.NewGuid(),
                 BrokerName = brokerDto.BrokerName,
                 UserID = brokerDto.UserID,
                 ApiKey = brokerDto.ApiKey,

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -65,6 +65,15 @@ namespace TradingJournal.Controllers
         [Route("update/broker/{id}")]
         public async Task<IActionResult> UpdateData(Guid id, BrokerDto brokerDto)
         {
+            if (id == Guid.Empty)
+            {
+                return BadRequest(new Response
+                {
+                    Success = false,
+                    Message = "BrokerId is required"
+                });
+            }
+
             if (brokerDto == null)
             {
                 return BadRequest(new Response
@@ -74,7 +83,21 @@ namespace TradingJournal.Controllers
                 });
             }
 
-            var result = await _brokerService.UpdateBrokerData(brokerDto);
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new Response
+                {
+                    Success = false,
+                    Message = "Invalid user token",
+                    Data = null
+                });
+            }
+
+            var result = await _brokerService.UpdateBrokerData(id, userId, brokerDto);
 
             if (!result.Success)
             {

@@ -1,4 +1,4 @@
-﻿using TradingJournal.Interfaces.Repository;
+using TradingJournal.Interfaces.Repository;
 using Microsoft.Extensions.Logging;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Mappers;
@@ -9,7 +9,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Cryptography;
 
 namespace TradingJournal.Services
 {
@@ -128,7 +127,10 @@ namespace TradingJournal.Services
             }
 
             var accessToken = GenerateAccessToken(user);
-            var refreshToken = GenerateRefreshToken();
+            var randomBytes = new byte[64];
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+            var refreshToken = Convert.ToBase64String(randomBytes);
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
             var result = await _userRepository.UpdateUser(user);
@@ -151,69 +153,50 @@ namespace TradingJournal.Services
             });
         }
 
-        public async Task<Response> RefreshToken(TokenDto tokenDto)
+        public async Task<Response> RefreshToken(RefreshTokenRequestDto refreshTokenRequestDto)
         {
-            if (tokenDto == null || string.IsNullOrWhiteSpace(tokenDto.AccessToken) || string.IsNullOrWhiteSpace(tokenDto.RefreshToken))
+            if (refreshTokenRequestDto == null || string.IsNullOrWhiteSpace(refreshTokenRequestDto.RefreshToken))
             {
                 return new Response
                 {
                     Success = false,
-                    Message = "AccessToken and RefreshToken are required",
+                    Message = "RefreshToken is required",
                     Data = null
                 };
             }
 
-            ClaimsPrincipal principal;
-            try
+            // Look up user directly by refresh token stored in the database
+            var user = await _userRepository.GetUserByRefreshToken(refreshTokenRequestDto.RefreshToken);
+
+            if (user == null)
             {
-                principal = GetPrincipalFromExpiredToken(tokenDto.AccessToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Refresh token failed: access token validation error.");
                 return new Response
                 {
                     Success = false,
-                    Message = "Invalid access token",
+                    Message = "Invalid refresh token",
                     Data = null
                 };
             }
-            var email = principal.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email)?.Value;
 
-            if (email == null)
+            if (user.RefreshTokenExpiry <= DateTime.UtcNow)
             {
-                return new Response { Success = false, Message = "Invalid access token", Data = null };
+                return new Response
+                {
+                    Success = false,
+                    Message = "Refresh token has expired. Please log in again.",
+                    Data = null
+                };
             }
 
-            var user = await _userRepository.GetUserByEmail(email);
-
-            if (user == null || user.RefreshToken != tokenDto.RefreshToken || user.RefreshTokenExpiry <= DateTime.UtcNow)
-            {
-                return new Response { Success = false, Message = "Invalid refresh token", Data = null };
-            }
-
+            // Only generate a new access token, reuse the same refresh token
             var newAccessToken = GenerateAccessToken(user);
-            var newRefreshToken = GenerateRefreshToken();
-
-            // Update the refresh token in the database
-            user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-            await _userRepository.UpdateUser(user);
 
             return new Response
             {
                 Success = true,
                 Message = "Token refreshed successfully",
-                Data = new { AccessToken = newAccessToken, RefreshToken = newRefreshToken }
+                Data = new { AccessToken = newAccessToken, RefreshToken = refreshTokenRequestDto.RefreshToken }
             };
-        }
-
-        private string GenerateRefreshToken()
-        {
-            var randomBytes = new byte[64];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(randomBytes);
-            return Convert.ToBase64String(randomBytes);
         }
 
         private string GenerateAccessToken(UserEntity user)
@@ -248,37 +231,5 @@ namespace TradingJournal.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
-        {
-            var secret = _configuration["Jwt:Secret"];
-            if (string.IsNullOrWhiteSpace(secret))
-            {
-                throw new InvalidOperationException("JWT secret is not configured.");
-            }
-
-            var issuer = _configuration["Jwt:Issuer"] ?? "TradingJournal";
-            var audience = _configuration["Jwt:Audience"] ?? "TradingJournal";
-
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = issuer,
-                ValidAudience = audience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
-                ValidateLifetime = false // only difference vs normal pipeline
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-
-            if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-            {
-                throw new SecurityTokenException("Invalid token");
-            }
-
-            return principal;
-        }
     }
 }

@@ -65,15 +65,6 @@ namespace TradingJournal.Controllers
         [Route("update/broker/{id}")]
         public async Task<IActionResult> UpdateData(Guid id, BrokerDto brokerDto)
         {
-            if (id == Guid.Empty)
-            {
-                return BadRequest(new Response
-                {
-                    Success = false,
-                    Message = "BrokerId is required"
-                });
-            }
-
             if (brokerDto == null)
             {
                 return BadRequest(new Response
@@ -97,7 +88,10 @@ namespace TradingJournal.Controllers
                 });
             }
 
-            var result = await _brokerService.UpdateBrokerData(id, userId, brokerDto);
+            brokerDto.Id = id;
+            brokerDto.UserID = userId;
+
+            var result = await _brokerService.UpdateBrokerData(brokerDto);
 
             if (!result.Success)
             {

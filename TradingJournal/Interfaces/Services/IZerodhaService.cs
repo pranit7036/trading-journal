@@ -8,6 +8,6 @@ namespace TradingJournal.Interfaces.Services
         public Task<Response> GetOrders(string apiKey, string accessToken);
         public Task<Response> GetHoldings(string apiKey, string accessToken);
         public Task<Response> GetPositions(string apiKey, string accessToken);
-        public Task<Response> SaveAccessToken(string requestToken);
+        public Task<Response> SaveAccessToken(string requestToken, Guid brokerId, Guid userId);
     }
 }

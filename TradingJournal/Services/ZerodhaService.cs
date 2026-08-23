@@ -26,19 +26,27 @@ namespace TradingJournal.Services
             _brokerRepository = brokerRepository;
         }
 
+        /// <summary>
+        /// Used by the hosted service (reads ApiKey/ApiSecret from appsettings).
+        /// Will be updated when the daily job is fully implemented.
+        /// </summary>
         public async Task<Response> GetToken(string requestToken)
         {
             var apiKey = _configuration["Zerodha:ApiKey"];
             var apiSecret = _configuration["Zerodha:ApiSecret"];
+            return await GetToken(requestToken, apiKey ?? string.Empty, apiSecret ?? string.Empty);
+        }
 
+        private async Task<Response> GetToken(string requestToken, string apiKey, string apiSecret)
+        {
             if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
             {
-                return new Response { Success = false, Message = "Zerodha config missing", Data = null };
+                return new Response { Success = false, Message = "ApiKey or ApiSecret is missing", Data = null };
             }
 
             var checksumInput = $"{apiKey}{requestToken}{apiSecret}";
             var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(checksumInput))).ToLowerInvariant();
-            
+
             var client = _httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
             var form = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -58,9 +66,9 @@ namespace TradingJournal.Services
 
             using var doc = JsonDocument.Parse(body);
             var accessToken = doc.RootElement.GetProperty("data").GetProperty("access_token").GetString();
-            var userId = doc.RootElement.GetProperty("data").GetProperty("user_id").GetString();
+            var zerodhaUserId = doc.RootElement.GetProperty("data").GetProperty("user_id").GetString();
 
-            return new Response { Success = true, Message = "Token generated", Data = new { accessToken, userId } };
+            return new Response { Success = true, Message = "Token generated", Data = new { accessToken, zerodhaUserId } };
         }
 
         public async Task<Response> GetOrders(string apiKey, string accessToken)
@@ -159,29 +167,29 @@ namespace TradingJournal.Services
             }
         }
 
-        public async Task<Response> SaveAccessToken(string requestToken)
+        public async Task<Response> SaveAccessToken(string requestToken, Guid brokerId, Guid userId)
         {
-            // Exchange the request token for an access token
-            var tokenResponse = await GetToken(requestToken);
+            // Fetch broker from DB — verifies it belongs to the authenticated user
+            var broker = await _brokerRepository.FindBroker(brokerId, userId);
+
+            if (broker == null)
+            {
+                return new Response { Success = false, Message = "Broker not found for the given brokerId", Data = null };
+            }
+
+            if (string.IsNullOrWhiteSpace(broker.ApiKey) || string.IsNullOrWhiteSpace(broker.ApiSecret))
+            {
+                return new Response { Success = false, Message = "Broker ApiKey or ApiSecret is not set in the database", Data = null };
+            }
+
+            // Exchange the request token using the broker's own ApiKey and ApiSecret from DB
+            var tokenResponse = await GetToken(requestToken, broker.ApiKey, broker.ApiSecret);
             if (!tokenResponse.Success)
             {
                 return tokenResponse;
             }
 
-            var apiKey = _configuration["Zerodha:ApiKey"];
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                return new Response { Success = false, Message = "Zerodha API key not configured", Data = null };
-            }
-
-            // Find the broker record by API key
-            var broker = await _brokerRepository.FindBrokerByApiKey(apiKey);
-            if (broker == null)
-            {
-                return new Response { Success = false, Message = "No broker found for the configured API key", Data = null };
-            }
-
-            // Extract tokens from the response
+            // Extract access token from the response
             var data = tokenResponse.Data;
             var accessToken = data?.GetType().GetProperty("accessToken")?.GetValue(data)?.ToString();
 
@@ -190,9 +198,9 @@ namespace TradingJournal.Services
                 return new Response { Success = false, Message = "Access token not found in response", Data = null };
             }
 
-            // Update the broker record with the access token
+            // Update the broker record with the new access token
             broker.AccessToken = accessToken;
-            broker.RefreshToken = requestToken; // Store the request token as refresh token for future re-auth
+            broker.RefreshToken = requestToken; // Store request token for future re-auth
             broker.TokenExpiry = DateTime.UtcNow.AddHours(8); // Zerodha tokens expire at 6 AM next day
             broker.IsActive = true;
 

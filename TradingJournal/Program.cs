@@ -1,3 +1,6 @@
+// Required for Npgsql v6+: allows DateTime with Kind=Unspecified for 'timestamp with time zone' columns.
+// Without this, Npgsql strictly requires DateTimeKind.Utc, causing ArgumentException on save.
+
 using EvolveDb;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +13,7 @@ using TradingJournal.Interfaces.Services;
 using TradingJournal.Repository;
 using TradingJournal.Services;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

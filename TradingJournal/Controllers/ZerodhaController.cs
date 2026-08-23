@@ -5,6 +5,7 @@ using System.Security.Claims;
 using TradingJournal.Interfaces.Repository;
 using TradingJournal.Interfaces.Services;
 using TradingJournal.Models;
+using TradingJournal.Models.Dto;
 
 namespace TradingJournal.Controllers
 {
@@ -13,38 +14,122 @@ namespace TradingJournal.Controllers
     [Authorize]
     public class ZerodhaController : ControllerBase
     {
-        private readonly IConfiguration _configuration;
         private readonly IZerodhaService _zerodhaService;
         private readonly IBrokerRepository _brokerRepository;
 
-        public ZerodhaController(IConfiguration configuration, IZerodhaService zerodhaService, IBrokerRepository brokerRepository)
+        public ZerodhaController(IZerodhaService zerodhaService, IBrokerRepository brokerRepository)
         {
-            _configuration = configuration;
             _zerodhaService = zerodhaService;
             _brokerRepository = brokerRepository;
         }
 
+        /// <summary>
+        /// Returns the Zerodha Kite Connect login URL for the specified broker.
+        /// The URL contains the broker's ApiKey (from DB) and brokerId as state.
+        /// The redirect target is the frontend callback page (configured in Zerodha developer console).
+        /// </summary>
         [HttpGet]
         [Route("kite/connect-url")]
-        public IActionResult GetConnectUrl()
+        public async Task<IActionResult> GetConnectUrl([FromQuery] Guid brokerId)
         {
-            var apiKey = _configuration["Zerodha:ApiKey"];
-            if (string.IsNullOrEmpty(apiKey))
+            if (brokerId == Guid.Empty)
             {
                 return BadRequest(new Response
                 {
                     Success = false,
-                    Message = "Zerodha API key is not configured",
+                    Message = "brokerId is required",
                     Data = null
                 });
             }
-            var url = $"https://kite.zerodha.com/connect/login?v=3&api_key={apiKey}";
 
-            return Ok(new Response{
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new Response
+                {
+                    Success = false,
+                    Message = "Invalid user token",
+                    Data = null
+                });
+            }
+
+            // Verify broker belongs to this user and fetch its ApiKey
+            var broker = await _brokerRepository.FindBroker(brokerId, userId);
+            if (broker == null)
+            {
+                return BadRequest(new Response
+                {
+                    Success = false,
+                    Message = "Broker not found or does not belong to this user",
+                    Data = null
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(broker.ApiKey))
+            {
+                return BadRequest(new Response
+                {
+                    Success = false,
+                    Message = "Broker ApiKey is not set. Please update your broker details first.",
+                    Data = null
+                });
+            }
+
+            // state=brokerId lets the frontend callback know which broker to pass to POST /kite/token
+            var url = $"https://kite.zerodha.com/connect/login?v=3&api_key={broker.ApiKey}&state={brokerId}";
+
+            return Ok(new Response
+            {
                 Success = true,
                 Message = "Zerodha connect URL retrieved successfully",
                 Data = url
             });
+        }
+
+        /// <summary>
+        /// Called by the frontend after Zerodha redirects back with request_token.
+        /// Exchanges the request_token for an access_token using the broker's own ApiKey/ApiSecret from DB.
+        /// Requires JWT — broker ownership is validated via userId from claims.
+        /// </summary>
+        [HttpPost]
+        [Route("kite/token")]
+        public async Task<IActionResult> ExchangeToken([FromBody] ZerodhaTokenRequestDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.RequestToken) || dto.BrokerId == Guid.Empty)
+            {
+                return BadRequest(new Response
+                {
+                    Success = false,
+                    Message = "RequestToken and BrokerId are required",
+                    Data = null
+                });
+            }
+
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new Response
+                {
+                    Success = false,
+                    Message = "Invalid user token",
+                    Data = null
+                });
+            }
+
+            var result = await _zerodhaService.SaveAccessToken(dto.RequestToken, dto.BrokerId, userId);
+
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
         }
 
         [HttpGet]
@@ -54,7 +139,7 @@ namespace TradingJournal.Controllers
             [FromHeader(Name = "X-Zerodha-Api-Key")] string? apiKey)
         {
             var resolvedApiKey = string.IsNullOrWhiteSpace(apiKey)
-                ? _configuration["Zerodha:ApiKey"]
+                ? null
                 : apiKey;
 
             if (string.IsNullOrWhiteSpace(resolvedApiKey) || string.IsNullOrWhiteSpace(accessToken))
@@ -75,42 +160,6 @@ namespace TradingJournal.Controllers
             }
 
             return Ok(result);
-        }
-        
-        [HttpGet]
-        [Route("kite/callback")]
-        [AllowAnonymous]
-        public async Task<IActionResult> HandleCallback([FromQuery] string request_token, [FromQuery] string? status)
-        {
-            if (string.IsNullOrEmpty(request_token))
-            {
-                return BadRequest(new Response
-                {
-                    Success = false,
-                    Message = "Request token is missing in the callback",
-                    Data = null
-                });
-            }
-
-            //if(!string.IsNullOrEmpty(status) && status.ToLower() == "sucesss")
-            //{
-                var result = _zerodhaService.GetToken(request_token);
-            //}
-
-            // Here you would typically exchange the request token for an access token
-            // and save it securely for future API calls. For now, we'll just return the token.
-
-            // Save the access token to the database for the specific user
-            var saveResult = await _zerodhaService.SaveAccessToken(request_token);
-
-            return Ok(new Response
-            {
-                Success = saveResult.Success,
-                Message = saveResult.Success 
-                    ? "Zerodha callback processed and access token saved successfully" 
-                    : saveResult.Message,
-                Data = new { RequestToken = request_token, Status = status, Result = result, SaveResult = saveResult.Data }
-            });
         }
 
         [HttpGet]

@@ -10,6 +10,5 @@ namespace TradingJournal.Interfaces.Repository
         public Task<List<BrokerEntity>> GetBrokersByUserId(Guid userId);
         public Task<BrokerEntity?> FindBroker(Guid brokerId, Guid userId);
         public Task<bool> DeleteBroker(BrokerEntity brokerEntity);
-        public Task<BrokerEntity?> FindBrokerByApiKey(string apiKey);
     }
 }

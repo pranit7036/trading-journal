@@ -46,24 +46,14 @@ namespace TradingJournal.Services
             };
         }
 
-        public async Task<Response> UpdateBrokerData(Guid brokerId, Guid userId, BrokerDto brokerDto)
+        public async Task<Response> UpdateBrokerData(BrokerDto brokerDto)
         {
-            if (brokerId == Guid.Empty)
+            if (brokerDto.Id == Guid.Empty)
             {
                 return new Response
                 {
                     Success = false,
                     Message = "BrokerId is required",
-                    Data = null
-                };
-            }
-
-            if (userId == Guid.Empty)
-            {
-                return new Response
-                {
-                    Success = false,
-                    Message = "UserID is required",
                     Data = null
                 };
             }
@@ -76,7 +66,7 @@ namespace TradingJournal.Services
             }
 
             // Verify the broker exists and belongs to this user
-            var existingBroker = await _brokerRepository.FindBroker(brokerId, userId);
+            var existingBroker = await _brokerRepository.FindBroker(brokerDto.Id, brokerDto.UserID);
 
             if (existingBroker == null)
             {

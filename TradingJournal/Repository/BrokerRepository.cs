@@ -49,10 +49,5 @@ namespace TradingJournal.Repository
             return true;
         }
 
-        public async Task<BrokerEntity?> FindBrokerByApiKey(string apiKey)
-        {
-            return await _context.Brokers
-                .FirstOrDefaultAsync(broker => broker.ApiKey == apiKey);
-        }
     }
 }
